@@ -1,3 +1,5 @@
+(require "helix/components.scm")
+
 (provide UIStyles
          UIStyles-text
          UIStyles-popup
@@ -16,14 +18,14 @@
 
 (define (ui-styles)
   (UIStyles
-   (theme-scope *helix.cx* "ui.text")
-   (theme-scope *helix.cx* "ui.popup")
-   (style-with-bold (theme-scope *helix.cx* "ui.text") #t)
-   (theme-scope *helix.cx* "ui.text.inactive")
-   (theme-scope *helix.cx* "ui.statusline")
-   (theme-scope *helix.cx* "diff.plus")
-   (theme-scope *helix.cx* "diff.minus")
-   (theme-scope *helix.cx* "info")
-   (theme-scope *helix.cx* "error")
-   (theme-scope *helix.cx* "ui.text")
-   (theme-scope *helix.cx* "ui.background")))
+   (theme-scope "ui.text")
+   (theme-scope "ui.popup")
+   (style-with-bold (theme-scope "ui.text"))
+   (theme-scope "ui.text.inactive")
+   (theme-scope "ui.statusline")
+   (theme-scope "diff.plus")
+   (theme-scope "diff.minus")
+   (theme-scope "info")
+   (theme-scope "error")
+   (theme-scope "ui.text")
+   (theme-scope "ui.background")))

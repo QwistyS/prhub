@@ -20,6 +20,31 @@ pub struct AuthorRaw {
     pub login: String,
 }
 
+/// Fetch "Global" PRs involving @me across all repos.
+pub fn list_involved_prs() -> Result<Vec<GhPrRaw>, String> {
+    let output = Command::new("gh")
+        .args([
+            "search",
+            "prs",
+            "--state=open",
+            "--limit", "50",
+            // The magic flag for "General" data:
+            "--involves=@me", 
+            "--json",
+            "number,title,author,state,headRefName,additions,deletions,updatedAt,repository",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to run gh search: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("gh search prs failed: {stderr}"));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse JSON: {e}"))
+}
+
 /// Fetch open PRs for the current repo via `gh` CLI.
 pub fn list_prs() -> Result<Vec<GhPrRaw>, String> {
     let output = Command::new("gh")

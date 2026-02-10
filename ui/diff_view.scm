@@ -6,16 +6,18 @@
 
 (require "ui/drawing.scm")
 (require "ui/styles.scm")
+(require "ui/ffi.scm")
+(require "ui/state.scm")
 
 ;; ---------------------------------------------------------------------------
 ;; Diff view rendering
 ;; ---------------------------------------------------------------------------
 
 (define (render-diff-view state rect frame styles)
-  (let* ([rx (rect-x rect)]
-         [ry (rect-y rect)]
-         [rw (rect-width rect)]
-         [rh (rect-height rect)]
+  (let* ([rx (area-x rect)]
+         [ry (area-y rect)]
+         [rw (area-width rect)]
+         [rh (area-height rect)]
          [engine (PrHubWindow-engine state)]
          [popup-style (UIStyles-popup styles)])
 

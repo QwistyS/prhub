@@ -9,6 +9,8 @@
 
 (require "ui/drawing.scm")
 (require "ui/styles.scm")
+(require "ui/ffi.scm")
+(require "ui/state.scm")
 (require "ui/diff_view.scm")
 
 ;; ---------------------------------------------------------------------------
@@ -17,7 +19,6 @@
 
 ;; screen: 'pr-list | 'diff-view
 ;; engine: PrHub instance from Rust
-(struct PrHubWindow (screen cursor-index scroll-offset engine diff-scroll) #:mutable)
 
 (define (create-prhub-window)
   (let ([engine (PrHub-new)])
@@ -45,10 +46,10 @@
 ;; ---------------------------------------------------------------------------
 
 (define (render-pr-list state rect frame styles)
-  (let* ([rx (rect-x rect)]
-         [ry (rect-y rect)]
-         [rw (rect-width rect)]
-         [rh (rect-height rect)]
+  (let* ([rx (area-x rect)]
+         [ry (area-y rect)]
+         [rw (area-width rect)]
+         [rh (area-height rect)]
          ;; Center a box taking 80% of space
          [box-w (min (- rw 4) 100)]
          [box-h (min (- rh 4) 30)]
