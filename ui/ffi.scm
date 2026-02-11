@@ -12,6 +12,7 @@
            PrHub-diff-fetch-complete?
            PrHub-diff-lines
            PrHub-diff-line-count
+           GhPr-repo-name
            GhPr-number
            GhPr-title
            GhPr-author
@@ -29,6 +30,7 @@
          PrHub-diff-fetch-complete?
          PrHub-diff-lines
          PrHub-diff-line-count
+         GhPr-repo-name
          GhPr-number
          GhPr-title
          GhPr-author

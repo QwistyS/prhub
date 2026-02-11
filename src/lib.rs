@@ -27,6 +27,7 @@ fn create_module() -> FFIModule {
         .register_fn("PrHub-diff-lines", pr::PrHub::diff_lines)
         .register_fn("PrHub-diff-line-count", pr::PrHub::diff_line_count)
         // GhPr accessors — use closures to adapt &self methods for Steel FFI
+        .register_fn("GhPr-repo-name", |pr: &pr::GhPr| pr.repo_name())
         .register_fn("GhPr-number", |pr: &pr::GhPr| pr.number())
         .register_fn("GhPr-title", |pr: &pr::GhPr| pr.title())
         .register_fn("GhPr-author", |pr: &pr::GhPr| pr.author())

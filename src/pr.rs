@@ -1,73 +1,61 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
-
-use steel_derive::Steel;
 
 use crate::github;
+use steel_derive::Steel;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
-// ---------------------------------------------------------------------------
-// GhPr — a single pull request, exposed to Steel
-// ---------------------------------------------------------------------------
+impl From<octocrab::models::issues::Issue> for GhPr {
+    fn from(issue: octocrab::models::issues::Issue) -> Self {
+        // Extract repo: "https://api.github.com/repos/owner/repo" -> "owner/repo"
+        let repo_name = issue.repository_url.path()
+            .split('/').skip(3).take(2).collect::<Vec<_>>().join("/");
 
-#[derive(Clone, Debug, Steel, PartialEq)]
-pub struct GhPr {
-    number: usize,
-    title: String,
-    author: String,
-    state: String,
-    branch: String,
-    additions: usize,
-    deletions: usize,
-    updated_at: String,
-}
+        let state = match issue.state {
+            octocrab::models::IssueState::Open => "open",
+            octocrab::models::IssueState::Closed => "closed",
+            _ => "unknown",
+        };
 
-impl GhPr {
-    pub fn number(&self) -> usize {
-        self.number
-    }
-    pub fn title(&self) -> String {
-        self.title.clone()
-    }
-    pub fn author(&self) -> String {
-        self.author.clone()
-    }
-    pub fn state(&self) -> String {
-        self.state.clone()
-    }
-    pub fn branch(&self) -> String {
-        self.branch.clone()
-    }
-    pub fn additions(&self) -> usize {
-        self.additions
-    }
-    pub fn deletions(&self) -> usize {
-        self.deletions
-    }
-    pub fn updated_at(&self) -> String {
-        self.updated_at.clone()
-    }
-}
-
-impl From<github::GhPrRaw> for GhPr {
-    fn from(raw: github::GhPrRaw) -> Self {
         Self {
-            number: raw.number as usize,
-            title: raw.title,
-            author: raw.author.login,
-            state: raw.state,
-            branch: raw.head_ref_name,
-            additions: raw.additions as usize,
-            deletions: raw.deletions as usize,
-            updated_at: raw.updated_at,
+            repo_name,
+            number: issue.number as usize,
+            title: issue.title,
+            author: issue.user.login,
+            state: state.to_string(),
+            updated_at: issue.updated_at.to_rfc3339(), // Octocrab uses chrono
+            // These stay empty until the user selects the PR for a detailed fetch
+            branch: String::new(),
+            additions: 0,
+            deletions: 0,
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// PrHub — main plugin state, exposed to Steel
-// ---------------------------------------------------------------------------
+#[derive(Clone, Debug, Steel, PartialEq)]
+pub struct GhPr {
+    pub repo_name: String,
+    pub number: usize,
+    pub title: String,
+    pub author: String,
+    pub state: String,
+    pub branch: String,
+    pub additions: usize,
+    pub deletions: usize,
+    pub updated_at: String,
+}
+
+// Add the getter for Steel to use
+impl GhPr {
+    pub fn repo_name(&self) -> String { self.repo_name.clone() }
+    pub fn number(&self) -> usize { self.number }
+    pub fn title(&self) -> String { self.title.clone() }
+    pub fn author(&self) -> String { self.author.clone() }
+    pub fn state(&self) -> String { self.state.clone() }
+    pub fn branch(&self) -> String { self.branch.clone() }
+    pub fn additions(&self) -> usize { self.additions }
+    pub fn deletions(&self) -> usize { self.deletions }
+    pub fn updated_at(&self) -> String { self.updated_at.clone() }
+}
 
 #[derive(Clone, Debug, Steel)]
 pub struct PrHub {
@@ -75,7 +63,6 @@ pub struct PrHub {
     error: Arc<Mutex<Option<String>>>,
     fetch_done: Arc<AtomicBool>,
     cancel: Arc<AtomicBool>,
-    // Diff state
     diff_lines: Arc<Mutex<Vec<String>>>,
     diff_done: Arc<AtomicBool>,
 }
@@ -97,33 +84,38 @@ impl PrHub {
             diff_done: Arc::new(AtomicBool::new(false)),
         }
     }
-
-    /// Kick off a background thread to fetch PRs.
+    
     pub fn start_fetch(&self) {
+        // 1. Mark as "In Progress" using an Atomic
         self.fetch_done.store(false, Ordering::SeqCst);
-        self.cancel.store(false, Ordering::SeqCst);
-        *self.error.lock().unwrap() = None;
-        self.prs.lock().unwrap().clear();
-
+    
         let prs = Arc::clone(&self.prs);
-        let error = Arc::clone(&self.error);
         let done = Arc::clone(&self.fetch_done);
-        let cancel = Arc::clone(&self.cancel);
+        let error = Arc::clone(&self.error);
 
         std::thread::spawn(move || {
-            if cancel.load(Ordering::SeqCst) {
-                return;
-            }
-            match github::list_prs() {
-                Ok(raw_prs) => {
-                    let converted: Vec<GhPr> = raw_prs.into_iter().map(GhPr::from).collect();
-                    *prs.lock().unwrap() = converted;
+            // 2. Start the isolated Async runtime
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                // 3. Do the heavy lifting WITHOUT any locks
+                match github::list_general_prs_native().await {
+                    Ok(raw_prs) => {
+                        let converted: Vec<GhPr> = raw_prs.into_iter().map(GhPr::from).collect();
+                    
+                        // 4. THE ONLY LOCK: Swap the pointer and drop it
+                        if let Ok(mut guard) = prs.lock() {
+                            *guard = converted;
+                        }
+                    }
+                    Err(e) => {
+                        if let Ok(mut err_guard) = error.lock() {
+                            *err_guard = Some(e.to_string());
+                        }
+                    }
                 }
-                Err(e) => {
-                    *error.lock().unwrap() = Some(e);
-                }
-            }
-            done.store(true, Ordering::SeqCst);
+                // 5. Signal the UI that it's safe to read now
+                done.store(true, Ordering::SeqCst);
+            });
         });
     }
 
@@ -151,9 +143,7 @@ impl PrHub {
         self.prs.lock().unwrap()[index].clone()
     }
 
-    // -- Diff fetching --
-
-    pub fn start_diff_fetch(&mut self, pr_number: usize) {
+    pub fn start_diff_fetch(&mut self, repo: String, pr_number: usize) {
         self.diff_done.store(false, Ordering::SeqCst);
         self.diff_lines.lock().unwrap().clear();
         *self.error.lock().unwrap() = None;
@@ -163,15 +153,18 @@ impl PrHub {
         let done = Arc::clone(&self.diff_done);
 
         std::thread::spawn(move || {
-            match github::fetch_diff(pr_number) {
-                Ok(diff) => {
-                    *lines.lock().unwrap() = diff.lines().map(String::from).collect();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                match github::fetch_diff(&repo, pr_number).await {
+                    Ok(diff) => {
+                        *lines.lock().unwrap() = diff.lines().map(String::from).collect();
+                    }
+                    Err(e) => {
+                        *error.lock().unwrap() = Some(e);
+                    }
                 }
-                Err(e) => {
-                    *error.lock().unwrap() = Some(e);
-                }
-            }
-            done.store(true, Ordering::SeqCst);
+                done.store(true, Ordering::SeqCst);
+            });
         });
     }
 

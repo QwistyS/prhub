@@ -160,7 +160,7 @@
        (when (> (PrHub-pr-count engine) 0)
          (let ([pr (PrHub-pr-at engine (PrHubWindow-cursor-index state))])
            (when pr
-             (PrHub-start-diff-fetch engine (GhPr-number pr))
+             (PrHub-start-diff-fetch engine (GhPr-repo-name pr) (GhPr-number pr))
              (set-PrHubWindow-diff-scroll! state 0)
              (set-PrHubWindow-screen! state 'diff-view))))
        event-result/consume]
