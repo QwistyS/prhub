@@ -22,7 +22,7 @@
          [popup-style (UIStyles-popup styles)])
 
     ;; Use the full area for diff
-    (draw-box! frame rx ry rw rh popup-style "Diff (Esc:back, j/k:scroll)")
+    (draw-box! frame rx ry rw rh popup-style "Full Diff (Esc:back, j/k:scroll)")
 
     (let ([cx (+ rx 1)]
           [cy (+ ry 1)]
@@ -72,9 +72,9 @@
   (let ([ch (key-event-char event)]
         [engine (PrHubWindow-engine state)])
     (cond
-      ;; Escape — back to PR list
+      ;; Escape — back to file list
       [(key-event-escape? event)
-       (set-PrHubWindow-screen! state 'pr-list)
+       (set-PrHubWindow-screen! state 'file-list)
        event-result/consume]
 
       ;; j / down — scroll down
@@ -97,9 +97,9 @@
        (scroll-diff state -15)
        event-result/consume]
 
-      ;; q — back to list
+      ;; q — back to file list
       [(and ch (equal? ch #\q))
-       (set-PrHubWindow-screen! state 'pr-list)
+       (set-PrHubWindow-screen! state 'file-list)
        event-result/consume]
 
       [else event-result/consume])))

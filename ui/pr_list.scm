@@ -12,18 +12,18 @@
 (require "ui/ffi.scm")
 (require "ui/state.scm")
 (require "ui/diff_view.scm")
+(require "ui/file_list.scm")
 
 ;; ---------------------------------------------------------------------------
 ;; State
 ;; ---------------------------------------------------------------------------
 
-;; screen: 'pr-list | 'diff-view
-;; engine: PrHub instance from Rust
-
 (define (create-prhub-window)
   (let ([engine (PrHub-new)])
     (PrHub-start-fetch engine)
-    (PrHubWindow 'pr-list 0 0 engine 0)))
+    (PrHubWindow 'pr-list 0 0 engine 0
+                 0 0 0      ;; file-cursor file-scroll file-diff-scroll
+                 "" 0)))    ;; current-repo current-pr-number
 
 (define (cancel-session! state)
   (PrHub-cancel-fetch (PrHubWindow-engine state)))
@@ -36,7 +36,9 @@
   (let ([styles (ui-styles)])
     (case (PrHubWindow-screen state)
       [(pr-list)   (render-pr-list state rect frame styles)]
-      [(diff-view) (render-diff-view state rect frame styles)])))
+      [(diff-view) (render-diff-view state rect frame styles)]
+      [(file-list) (render-file-list state rect frame styles)]
+      [(file-diff) (render-file-diff state rect frame styles)])))
 
 (define (prhub-cursor-handler state)
   #f)
@@ -95,7 +97,7 @@
            ;; Status line
            (draw-text-line! frame cx cy
                             (string-append "PRs (" (number->string count)
-                                           ") | j/k:navigate | Enter:view diff | q:quit")
+                                           ") | j/k:navigate | Enter:files | q:quit")
                             (UIStyles-status styles) cw)
 
            ;; PR rows
@@ -135,7 +137,9 @@
 (define (prhub-event-handler state event)
   (case (PrHubWindow-screen state)
     [(pr-list)   (handle-pr-list-event state event)]
-    [(diff-view) (handle-diff-view-event state event)]))
+    [(diff-view) (handle-diff-view-event state event)]
+    [(file-list) (handle-file-list-event state event)]
+    [(file-diff) (handle-file-diff-event state event)]))
 
 (define (handle-pr-list-event state event)
   (let ([engine (PrHubWindow-engine state)]
@@ -155,14 +159,19 @@
        (move-cursor state -1)
        event-result/consume]
 
-      ;; Enter — open diff view
+      ;; Enter — open file list for selected PR
       [(key-event-enter? event)
        (when (> (PrHub-pr-count engine) 0)
          (let ([pr (PrHub-pr-at engine (PrHubWindow-cursor-index state))])
            (when pr
-             (PrHub-start-diff-fetch engine (GhPr-repo-name pr) (GhPr-number pr))
-             (set-PrHubWindow-diff-scroll! state 0)
-             (set-PrHubWindow-screen! state 'diff-view))))
+             (let ([repo (GhPr-repo-name pr)]
+                   [num  (GhPr-number pr)])
+               (set-PrHubWindow-current-repo! state repo)
+               (set-PrHubWindow-current-pr-number! state num)
+               (PrHub-start-files-fetch engine repo num)
+               (set-PrHubWindow-file-cursor! state 0)
+               (set-PrHubWindow-file-scroll! state 0)
+               (set-PrHubWindow-screen! state 'file-list)))))
        event-result/consume]
 
       ;; r — refresh

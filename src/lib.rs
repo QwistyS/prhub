@@ -36,6 +36,20 @@ fn create_module() -> FFIModule {
         .register_fn("GhPr-additions", |pr: &pr::GhPr| pr.additions())
         .register_fn("GhPr-deletions", |pr: &pr::GhPr| pr.deletions())
         .register_fn("GhPr-updated-at", |pr: &pr::GhPr| pr.updated_at())
+        // Changed files
+        .register_fn("PrHub-start-files-fetch", pr::PrHub::start_files_fetch)
+        .register_fn("PrHub-files-fetch-complete?", pr::PrHub::files_fetch_complete)
+        .register_fn("PrHub-file-count", pr::PrHub::file_count)
+        .register_fn("PrHub-file-at", pr::PrHub::file_at)
+        .register_fn("PrHub-set-file-diff", pr::PrHub::set_file_diff)
+        .register_fn("PrHub-file-diff-lines", pr::PrHub::file_diff_lines)
+        .register_fn("PrHub-file-diff-line-count", pr::PrHub::file_diff_line_count)
+        // GhChangedFile accessors
+        .register_fn("GhChangedFile-filename", |f: &pr::GhChangedFile| f.filename())
+        .register_fn("GhChangedFile-status", |f: &pr::GhChangedFile| f.status())
+        .register_fn("GhChangedFile-additions", |f: &pr::GhChangedFile| f.additions())
+        .register_fn("GhChangedFile-deletions", |f: &pr::GhChangedFile| f.deletions())
+        .register_fn("GhChangedFile-patch", |f: &pr::GhChangedFile| f.patch())
         // Unicode helpers
         .register_fn("unicode-display-width", unicode_display_width)
         .register_fn("unicode-truncate-to-width", unicode_truncate_to_width);
