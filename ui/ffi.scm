@@ -29,6 +29,7 @@
            GhChangedFile-status
            GhChangedFile-additions
            GhChangedFile-deletions
+           GhChangedFile-review-comments
            GhChangedFile-patch))
 
 (provide PrHub-new
@@ -59,4 +60,5 @@
          GhChangedFile-status
          GhChangedFile-additions
          GhChangedFile-deletions
+         GhChangedFile-review-comments
          GhChangedFile-patch)

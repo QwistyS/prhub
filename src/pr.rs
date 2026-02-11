@@ -63,6 +63,7 @@ pub struct GhChangedFile {
     pub additions: usize,
     pub deletions: usize,
     pub patch: String,
+    pub review_comments: usize,
 }
 
 impl From<octocrab::models::repos::DiffEntry> for GhChangedFile {
@@ -73,6 +74,7 @@ impl From<octocrab::models::repos::DiffEntry> for GhChangedFile {
             additions: entry.additions as usize,
             deletions: entry.deletions as usize,
             patch: entry.patch.unwrap_or_default(),
+            review_comments: 0,
         }
     }
 }
@@ -83,6 +85,7 @@ impl GhChangedFile {
     pub fn additions(&self) -> usize { self.additions }
     pub fn deletions(&self) -> usize { self.deletions }
     pub fn patch(&self) -> String { self.patch.clone() }
+    pub fn review_comments(&self) -> usize { self.review_comments }
 }
 
 #[derive(Clone, Debug, Steel)]
@@ -237,8 +240,24 @@ impl PrHub {
             rt.block_on(async {
                 match github::fetch_changed_files(&repo, pr_number).await {
                     Ok((entries, head_sha)) => {
-                        let converted: Vec<GhChangedFile> =
-                            entries.into_iter().map(GhChangedFile::from).collect();
+                        let comment_counts = match github::fetch_review_comment_counts(&repo, pr_number).await {
+                            Ok(counts) => counts,
+                            Err(e) => {
+                                log::warn!(
+                                    "fetch_review_comment_counts failed for {repo}#{pr_number}: {e}"
+                                );
+                                std::collections::HashMap::new()
+                            }
+                        };
+                        let converted: Vec<GhChangedFile> = entries
+                            .into_iter()
+                            .map(|entry| {
+                                let mut file = GhChangedFile::from(entry);
+                                file.review_comments =
+                                    comment_counts.get(&file.filename).copied().unwrap_or(0);
+                                file
+                            })
+                            .collect();
                         *files.lock().unwrap() = converted;
                         *sha.lock().unwrap() = head_sha;
                     }

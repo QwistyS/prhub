@@ -49,6 +49,7 @@ fn create_module() -> FFIModule {
         .register_fn("GhChangedFile-status", |f: &pr::GhChangedFile| f.status())
         .register_fn("GhChangedFile-additions", |f: &pr::GhChangedFile| f.additions())
         .register_fn("GhChangedFile-deletions", |f: &pr::GhChangedFile| f.deletions())
+        .register_fn("GhChangedFile-review-comments", |f: &pr::GhChangedFile| f.review_comments())
         .register_fn("GhChangedFile-patch", |f: &pr::GhChangedFile| f.patch())
         // Unicode helpers
         .register_fn("unicode-display-width", unicode_display_width)

@@ -1,4 +1,5 @@
 use octocrab::Octocrab;
+use std::collections::HashMap;
 
 fn github_token() -> Result<String, String> {
     std::env::var("GITHUB_TOKEN")
@@ -123,6 +124,57 @@ pub async fn fetch_changed_files(
     }
 
     Ok((all_files, head_sha))
+}
+
+pub async fn fetch_review_comment_counts(
+    repo: &str,
+    pr_number: usize,
+) -> Result<HashMap<String, usize>, String> {
+    let (owner, repo_name) = repo
+        .split_once('/')
+        .ok_or_else(|| "Invalid repo name (expected owner/repo)".to_string())?;
+    let token = github_token()?;
+    let octo = Octocrab::builder()
+        .personal_token(token)
+        .build()
+        .map_err(format_octocrab_error)?;
+
+    let page = octo
+        .pulls(owner, repo_name)
+        .list_comments(Some(pr_number as u64))
+        .per_page(100)
+        .send()
+        .await
+        .map_err(|e| format!("list_comments failed: {}", format_octocrab_error(e)))?;
+
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for comment in page.items {
+        *counts.entry(comment.path).or_insert(0) += 1;
+    }
+    let mut next = page.next;
+
+    while next.is_some() {
+        let next_page = octo
+            .get_page::<octocrab::models::pulls::Comment>(&next)
+            .await
+            .map_err(|e| {
+                format!(
+                    "list_comments pagination failed: {}",
+                    format_octocrab_error(e)
+                )
+            })?;
+
+        let Some(next_page) = next_page else {
+            break;
+        };
+
+        for comment in next_page.items {
+            *counts.entry(comment.path).or_insert(0) += 1;
+        }
+        next = next_page.next;
+    }
+
+    Ok(counts)
 }
 
 pub async fn fetch_diff(repo: &str, pr_number: usize) -> Result<String, String> {

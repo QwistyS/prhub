@@ -62,7 +62,7 @@
            ;; Status line
            (draw-text-line! frame cx cy
                             (string-append "Files (" (number->string count)
-                                           ") | j/k:navigate | Enter:diff | Esc:back")
+                                           ") | c#:review-comments | j/k:navigate | Enter:diff | Esc:back")
                             (UIStyles-status styles) cw)
 
            ;; File rows
@@ -89,16 +89,21 @@
                  [else "?"])]
          [stats (string-append " +" (number->string (GhChangedFile-additions file))
                                "/-" (number->string (GhChangedFile-deletions file)))]
+         [comment-badge (let ([n (GhChangedFile-review-comments file)])
+                          (if (> n 0)
+                              (string-append " c" (number->string n))
+                              ""))]
          [prefix (string-append flag " ")]
          [name-space (max 10 (- max-width
                                 (string-length prefix)
+                                (string-length comment-badge)
                                 (string-length stats)))]
          [name (let ([n (GhChangedFile-filename file)])
                  (if (> (string-length n) name-space)
                      (string-append "~" (substring n (- (string-length n) (- name-space 1))
                                                      (string-length n)))
                      n))])
-    (string-append prefix name stats)))
+    (string-append prefix name comment-badge stats)))
 
 ;; ---------------------------------------------------------------------------
 ;; File list event handling
